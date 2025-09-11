@@ -3,12 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 import mammoth from "mammoth";
 
-// Set worker via CDN
+// PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-
 export default function SmartDocumentHub() {
-  const { role } = useParams(); // role from URL
+  const { role } = useParams();
   const navigate = useNavigate();
   const [docs, setDocs] = useState(() => {
     try {
@@ -20,13 +19,14 @@ export default function SmartDocumentHub() {
   });
   const [query, setQuery] = useState("");
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [activeSubMenu, setActiveSubMenu] = useState("uploadFile"); 
+  const [newDocs, setNewDocs] = useState([]); 
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem("smart_docs_v1", JSON.stringify(docs));
   }, [docs]);
 
-  // Role-based visibility
   const visibleDocsForRole = (r, list) => {
     if (r === "admin") return list;
     if (r === "engineer") return list.filter(d => ["engineering", "safety", "general"].includes(d.category));
@@ -35,22 +35,7 @@ export default function SmartDocumentHub() {
   };
 
   const visibleDocs = visibleDocsForRole(role, docs);
-  const filteredByQuery = visibleDocs.filter(d => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return (d.name || "").toLowerCase().includes(q) ||
-           (d.summary || "").toLowerCase().includes(q) ||
-           (d.rawText || "").toLowerCase().includes(q);
-  });
 
-  const counts = docs.reduce((acc, d) => {
-    acc[d.category] = (acc[d.category] || 0) + 1;
-    return acc;
-  }, {});
-
-  // ---------------------
-  // File Text Extraction
-  // ---------------------
   async function extractTextFromFile(file) {
     try {
       if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
@@ -76,13 +61,10 @@ export default function SmartDocumentHub() {
       }
     } catch (err) {
       console.error("Error extracting text:", err);
-      return file.name; // fallback
+      return file.name;
     }
   }
 
-  // ---------------------
-  // Upload Handling
-  // ---------------------
   async function handleUpload(e) {
     const files = e.target.files || [];
     if (!files.length) return;
@@ -99,6 +81,7 @@ export default function SmartDocumentHub() {
         size: f.size,
         type: f.type || "application/octet-stream",
         uploadedAt: new Date().toISOString(),
+        uploadedBy: role,
         category,
         summary,
         rawText: rawText.slice(0, 20000),
@@ -110,9 +93,6 @@ export default function SmartDocumentHub() {
     if (fileInputRef.current) fileInputRef.current.value = null;
   }
 
-  // ---------------------
-  // Summary & Classification
-  // ---------------------
   function createSummary(text, wordLimit = 30) {
     if (!text) return "(No text content)";
     const words = text.replace(/\s+/g, " ").trim().split(" ");
@@ -143,123 +123,124 @@ export default function SmartDocumentHub() {
     if (selectedDoc && selectedDoc.id === id) setSelectedDoc(null);
   }
 
-  // ---------------------
-  // Render
-  // ---------------------
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <header className="flex items-center justify-between mb-6">
+  const renderSubMenuContent = () => {
+    switch (activeSubMenu) {
+      case "uploadFile":
+        return (
           <div>
-            <h1 className="text-2xl font-bold">Smart Document Hub — {role.charAt(0).toUpperCase() + role.slice(1)}</h1>
-          </div>
-          <button
-            onClick={()=>navigate("/signin")}
-            className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
-          >Sign Out</button>
-        </header>
+            <input ref={fileInputRef} type="file" multiple onChange={handleUpload} className="border p-2 rounded w-full" />
+            <p className="text-xs text-gray-500 mt-1">Supported: TXT / PDF / DOCX. Scanned images require OCR.</p>
 
-        {/* Upload & Search */}
-        <section className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row md:justify-between gap-4">
-          <div>
-            <input ref={fileInputRef} type="file" multiple onChange={handleUpload} />
-            <p className="text-xs text-gray-500 mt-1">TXT / PDF / DOCX. Scanned images require OCR.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              placeholder="Search documents..."
-              value={query}
-              onChange={e=>setQuery(e.target.value)}
-              className="p-2 border rounded-md w-72"
-            />
-            <button onClick={()=>setQuery("")} className="px-3 py-2 bg-gray-100 rounded-md">Clear</button>
-          </div>
-        </section>
-
-        {/* Dashboard & Documents */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Dashboard */}
-          <aside className="col-span-1 bg-white p-4 rounded-lg shadow-sm">
-            <h3 className="font-semibold mb-3">Dashboard</h3>
-            <div className="space-y-2 text-sm text-gray-700">
-              <div>All documents: <strong>{docs.length}</strong></div>
-              <div>Visible to role ({role}): <strong>{visibleDocs.length}</strong></div>
-              <div className="mt-2 space-y-1">
-                {Object.entries(counts).map(([cat,num])=>(
-                  <div key={cat} className="flex justify-between capitalize">{cat} <span>{num}</span></div>
+            {/* Show uploaded documents like earlier */}
+            {docs.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h2 className="font-semibold text-lg mb-2">Uploaded Documents</h2>
+                {docs.map(d => (
+                  <div key={d.id} className="p-2 border rounded-md flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{d.name}</p>
+                      <p className="text-sm text-gray-600">Category: {d.category} | Uploaded By: {d.uploadedBy} | {new Date(d.uploadedAt).toLocaleString()}</p>
+                      <p className="text-sm mt-1">{d.summary}</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <a href={d.blobUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Download</a>
+                      <button onClick={()=>handleDelete(d.id)} className="text-red-600">Delete</button>
+                    </div>
+                  </div>
                 ))}
               </div>
+            )}
+          </div>
+        );
+      case "email":
+        return (
+          <div className="space-y-2">
+            {newDocs.length === 0 ? <p>No new email documents.</p> :
+            newDocs.map(d => (
+              <div key={d.id} className="p-2 border rounded-md shadow-sm">{d.name} — {d.summary}</div>
+            ))}
+          </div>
+        );
+      case "newPopups":
+        return (
+          <div>
+            <p>No new pop-ups yet.</p>
+          </div>
+        );
+      case "viewTable":
+        return (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse shadow rounded-lg overflow-hidden">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-3 py-2 border-b">Name</th>
+                  <th className="px-3 py-2 border-b">Category</th>
+                  <th className="px-3 py-2 border-b">Uploaded By</th>
+                  <th className="px-3 py-2 border-b">Date</th>
+                  <th className="px-3 py-2 border-b">Summary</th>
+                  <th className="px-3 py-2 border-b">Download</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleDocs.map(d => (
+                  <tr key={d.id} className="hover:bg-gray-50 border-b">
+                    <td className="px-3 py-2">{d.name}</td>
+                    <td className="px-3 py-2">{d.category}</td>
+                    <td className="px-3 py-2">{d.uploadedBy}</td>
+                    <td className="px-3 py-2">{new Date(d.uploadedAt).toLocaleString()}</td>
+                    <td className="px-3 py-2">{d.summary}</td>
+                    <td className="px-3 py-2">
+                      <a href={d.blobUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Download</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">
+            Smart Document Hub — {role.charAt(0).toUpperCase() + role.slice(1)}
+          </h1>
+          <button onClick={()=>navigate("/signin")} className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
+            Sign Out
+          </button>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar */}
+          <aside className="col-span-1 bg-white p-4 rounded-lg shadow-sm flex flex-col space-y-2">
+            <div>
+              <p className="font-semibold mb-1">Upload</p>
+              <button className={`px-3 py-2 rounded w-full ${activeSubMenu==="uploadFile"?"bg-blue-500 text-white":"bg-gray-100"}`} onClick={()=>setActiveSubMenu("uploadFile")}>Upload File</button>
+            </div>
+            <div>
+              <p className="font-semibold mb-1 mt-3">Emails</p>
+              <button className={`px-3 py-2 rounded w-full ${activeSubMenu==="email"?"bg-blue-500 text-white":"bg-gray-100"}`} onClick={()=>setActiveSubMenu("email")}>Email Summary</button>
+            </div>
+            <div>
+              <p className="font-semibold mb-1 mt-3">Notifications</p>
+              <button className={`px-3 py-2 rounded w-full ${activeSubMenu==="newPopups"?"bg-blue-500 text-white":"bg-gray-100"}`} onClick={()=>setActiveSubMenu("newPopups")}>New Popups</button>
+            </div>
+            <div>
+              <p className="font-semibold mb-1 mt-3">Documents</p>
+              <button className={`px-3 py-2 rounded w-full ${activeSubMenu==="viewTable"?"bg-blue-500 text-white":"bg-gray-100"}`} onClick={()=>setActiveSubMenu("viewTable")}>View Table</button>
             </div>
           </aside>
 
-          {/* Document List */}
-          <main className="col-span-2 bg-white p-4 rounded-lg shadow-sm">
-            <h3 className="font-semibold mb-3">Documents</h3>
-            <div className="border rounded-md overflow-hidden">
-              {filteredByQuery.length === 0 ? (
-                <div className="p-6 text-center text-gray-500">No documents match search/role.</div>
-              ) : (
-                <ul>
-                  {filteredByQuery.map(d=>(
-                    <li key={d.id} className="flex items-start gap-4 px-4 py-3 border-b last:border-b-0">
-                      <div className="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center text-sm text-gray-500">DOC</div>
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <div>
-                            <div className="font-medium">{d.name}</div>
-                            <div className="text-xs text-gray-500">{new Date(d.uploadedAt).toLocaleString()}</div>
-                          </div>
-                          <div className="text-sm text-gray-600 capitalize">{d.category}</div>
-                        </div>
-                        <div className="text-sm text-gray-700 mt-2">{d.summary}</div>
-                        <div className="mt-3 flex gap-2">
-                          <button onClick={()=>setSelectedDoc(d)} className="px-3 py-1 border rounded-md">Preview</button>
-                          <a href={d.blobUrl} target="_blank" rel="noreferrer" className="px-3 py-1 border rounded-md">Open</a>
-                          {role==="admin" && (
-                            <button onClick={()=>handleDelete(d.id)} className="px-3 py-1 border rounded-md text-red-600">Delete</button>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+          {/* Main Content */}
+          <main className="col-span-3 bg-white p-4 rounded-lg shadow-sm">
+            {renderSubMenuContent()}
           </main>
         </div>
-
-        {/* Preview Modal */}
-        {selectedDoc && (
-          <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-3xl w-full shadow-lg p-4">
-              <div className="flex justify-between items-start gap-4">
-                <div>
-                  <h3 className="font-semibold">{selectedDoc.name}</h3>
-                  <div className="text-xs text-gray-500">Category: {selectedDoc.category}</div>
-                  <div className="text-xs text-gray-500">Uploaded: {new Date(selectedDoc.uploadedAt).toLocaleString()}</div>
-                </div>
-                <button onClick={()=>setSelectedDoc(null)} className="px-3 py-1 border rounded-md">Close</button>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium">Summary</h4>
-                  <p className="text-sm text-gray-700 mt-2">{selectedDoc.summary}</p>
-                  <h4 className="font-medium mt-4">Extract (first 500 chars)</h4>
-                  <pre className="text-xs text-gray-700 bg-gray-50 p-3 rounded mt-2 max-h-48 overflow-auto">{selectedDoc.rawText.slice(0,500)}</pre>
-                </div>
-                <div>
-                  <h4 className="font-medium">Actions</h4>
-                  <div className="flex flex-col gap-2 mt-2">
-                    <a href={selectedDoc.blobUrl} target="_blank" rel="noreferrer" className="px-3 py-2 border rounded-md text-center">Open Original File</a>
-                    <button onClick={()=>navigator.clipboard.writeText(selectedDoc.summary||selectedDoc.name)} className="px-3 py-2 border rounded-md">Copy Summary</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
