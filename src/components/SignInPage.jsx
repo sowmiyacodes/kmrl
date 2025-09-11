@@ -10,14 +10,12 @@ const users = {
 
 export default function SignInPage() {
   const navigate = useNavigate();
-
   const [selectedRole, setSelectedRole] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [captchaInput, setCaptchaInput] = useState("");
   const [error, setError] = useState("");
 
-  // Simple captcha: add two numbers
   const [captcha, setCaptcha] = useState({
     a: Math.floor(Math.random() * 10 + 1),
     b: Math.floor(Math.random() * 10 + 1),
@@ -32,7 +30,6 @@ export default function SignInPage() {
       return;
     }
 
-    // Check captcha
     if (parseInt(captchaInput) !== captcha.a + captcha.b) {
       setError("Captcha is incorrect");
       generateNewCaptcha();
@@ -42,7 +39,7 @@ export default function SignInPage() {
     const user = users[selectedRole];
     if (user.username === username && user.password === password) {
       setError("");
-      navigate(`/dashboard/${selectedRole}`);
+      navigate(`/dashboard/${selectedRole}`); // Pass role in URL
     } else {
       setError("Invalid username or password");
       generateNewCaptcha();
@@ -58,6 +55,7 @@ export default function SignInPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
       <h1 className="text-3xl font-bold mb-6 text-gray-900">Sign In</h1>
 
+      {/* Role selection */}
       <div className="flex gap-4 mb-6 flex-wrap justify-center">
         {roles.map((role) => (
           <button
@@ -74,6 +72,7 @@ export default function SignInPage() {
         ))}
       </div>
 
+      {/* Login form */}
       {selectedRole && (
         <form
           onSubmit={handleLogin}
