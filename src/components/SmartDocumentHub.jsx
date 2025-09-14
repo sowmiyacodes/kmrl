@@ -156,7 +156,7 @@ export default function SmartDocumentHub() {
   async function fetchEmails() {
     setLoadingEmails(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/check_emails");
+      const res = await fetch("http://127.0.0.1:5001/check_emails");
       const data = await res.json();
       const newFiles = data.messages.map((m, index) => ({
         id: `${Date.now()}-${index}`,
@@ -192,10 +192,24 @@ export default function SmartDocumentHub() {
                       <p className="text-sm text-gray-600">Category: {d.category} | Uploaded By: {d.uploadedBy} | {new Date(d.uploadedAt).toLocaleString()}</p>
                       <p className="text-sm mt-1">{d.summary}</p>
                     </div>
-                    <div className="flex space-x-2">
-                      <a href={d.blobUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Download</a>
-                      <button onClick={() => handleDelete(d.id)} className="text-red-600">Delete</button>
-                    </div>
+                  <div className="flex space-x-4">
+                      <a
+                        href={d.blobUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transform hover:scale-105 transition-all text-base"
+                      >
+                        Download
+                      </a>
+                      <button
+                        onClick={() => handleDelete(d.id)}
+                        className="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-lg hover:bg-red-700 transform hover:scale-105 transition-all text-base"
+                      >
+                        Delete
+                      </button>
+</div>
+
+
                   </div>
                 ))}
               </div>
