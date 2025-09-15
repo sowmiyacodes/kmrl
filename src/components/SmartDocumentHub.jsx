@@ -170,33 +170,42 @@ export default function SmartDocumentHub() {
   // -----------------------------
   // Preview handler
   // -----------------------------
-  async function handlePreview(doc) {
-    setPreviewDoc(doc);
-    setLoadingPreview(true);
+ async function handlePreview(doc) {
+  setPreviewDoc(doc);
+  setLoadingPreview(true);
 
-    try {
-      // Create blob from raw text
-      const fileBlob = new Blob([doc.rawText], { type: "text/plain" });
-      const formData = new FormData();
-      formData.append("file", fileBlob, doc.name);
-
-      // Call Flask backend (trans.py)
-      const res = await fetch("http://127.0.0.1:5001/translate_file", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      setSummaryText(data.summary || "(No summary)");
-      setTranslatedText(data.translation || "(No translation)");
-    } catch (err) {
-      console.error("Preview error:", err);
-      setSummaryText("(Error fetching summary)");
-      setTranslatedText("(Error fetching translation)");
-    } finally {
-      setLoadingPreview(false);
+  try {
+    const formData = new FormData();
+    if (doc.blobUrl) {
+      const res = await fetch(doc.blobUrl);
+      const blob = await res.blob();
+      formData.append("file", blob, doc.name);
+    } else if (doc.downloadUrl) {
+      const res = await fetch(doc.downloadUrl);
+      const blob = await res.blob();
+      formData.append("file", blob, doc.name);
+    } else {
+      const blob = new Blob([doc.rawText], { type: "text/plain" });
+      formData.append("file", blob, doc.name);
     }
+
+    const response = await fetch("http://127.0.0.1:5001/summarize_file", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    setSummaryText(data.summary || "(No summary available)");
+    setTranslatedText("(Translation not implemented here)"); // optional
+  } catch (err) {
+    console.error("Preview error:", err);
+    setSummaryText("(Error generating summary)");
+    setTranslatedText("(Error fetching translation)");
+  } finally {
+    setLoadingPreview(false);
   }
+}
+
 
   const renderSubMenuContent = () => {
     switch (activeSubMenu) {
