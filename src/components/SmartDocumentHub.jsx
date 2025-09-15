@@ -22,7 +22,7 @@ export default function SmartDocumentHub() {
   const [newDocs, setNewDocs] = useState([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
-  const [summaryText, setSummaryText] = useState("");
+  const [previewContent, setPreviewContent] = useState("");
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -90,9 +90,9 @@ export default function SmartDocumentHub() {
 
     const uploaded = [];
     for (const f of Array.from(files)) {
-      const rawText = await extractTextFromFile(f) || f.name;
+      const rawText = await extractTextFromFile(f);
       const category = classifyText(rawText + " " + f.name);
-      const summary = createSummary(rawText);
+      const summary = rawText.slice(0, 50); // first 50 chars for summary
 
       uploaded.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -103,18 +103,13 @@ export default function SmartDocumentHub() {
         uploadedBy: role,
         category,
         summary,
-        rawText: rawText.slice(0, 20000),
+        rawText: rawText, // full content for preview
         blobUrl: URL.createObjectURL(f),
       });
     }
 
     setDocs((prev) => [...uploaded, ...prev]);
     if (fileInputRef.current) fileInputRef.current.value = null;
-  }
-
-  function createSummary(text, charLimit = 50) {
-    if (!text) return "(No text content)";
-    return text.length <= charLimit ? text : text.slice(0, charLimit) + "...";
   }
 
   function classifyText(text) {
@@ -160,12 +155,9 @@ export default function SmartDocumentHub() {
     }
   }
 
-  // -------------------------------
-  // Preview only for uploaded documents
-  // -------------------------------
   function handlePreview(doc) {
     setPreviewDoc(doc);
-    setSummaryText(doc.summary || createSummary(doc.rawText));
+    setPreviewContent(doc.rawText || "No content available for preview");
   }
 
   const renderSubMenuContent = () => {
@@ -219,29 +211,6 @@ export default function SmartDocumentHub() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* Preview Modal */}
-            {previewDoc && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 max-h-[80vh] overflow-y-auto">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-800">
-                      Preview — {previewDoc.name}
-                    </h2>
-                    <button
-                      onClick={() => setPreviewDoc(null)}
-                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <div className="p-3 border rounded bg-gray-50">
-                    <h3 className="font-semibold text-gray-700 mb-2">Summary (50 chars)</h3>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{summaryText}</p>
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -320,6 +289,12 @@ export default function SmartDocumentHub() {
                         Download
                       </a>
                       <button
+                        onClick={() => handlePreview(d)}
+                        className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                      >
+                        Preview
+                      </button>
+                      <button
                         onClick={() => handleDelete(d.id)}
                         className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
                       >
@@ -372,7 +347,7 @@ export default function SmartDocumentHub() {
                         ? "bg-blue-500 text-white hover:bg-blue-600"
                         : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                     } transition`}
-                    onClick={() => setActiveSubMenu(key)}
+                    onClick={() => setPreviewDoc(null) || setActiveSubMenu(key)}
                   >
                     {labels[key]}
                   </button>
@@ -385,6 +360,56 @@ export default function SmartDocumentHub() {
           <main className="col-span-3">{renderSubMenuContent()}</main>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800">
+                Preview — {previewDoc.name}
+              </h2>
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+              >
+                Close
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">
+                <strong>Category:</strong> {previewDoc.category} | 
+                <strong> Uploaded By:</strong> {previewDoc.uploadedBy} | 
+                <strong> Date:</strong> {new Date(previewDoc.uploadedAt).toLocaleString()}
+              </p>
+            </div>
+            
+            <div className="p-4 border rounded bg-gray-50">
+              <h3 className="font-semibold text-gray-700 mb-2">Document Content</h3>
+              <div className="text-sm text-gray-800 whitespace-pre-wrap overflow-auto max-h-96">
+                {previewContent}
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end space-x-2">
+              <a
+                href={previewDoc.blobUrl}
+                download={previewDoc.name}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              >
+                Download
+              </a>
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
