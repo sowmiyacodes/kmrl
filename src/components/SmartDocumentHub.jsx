@@ -23,12 +23,6 @@ export default function SmartDocumentHub() {
   const [loadingEmails, setLoadingEmails] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Preview states
-  const [previewDoc, setPreviewDoc] = useState(null);
-  const [translatedText, setTranslatedText] = useState("");
-  const [summaryText, setSummaryText] = useState("");
-  const [loadingPreview, setLoadingPreview] = useState(false);
-
   useEffect(() => {
     localStorage.setItem("smart_docs_v1", JSON.stringify(docs));
   }, [docs]);
@@ -64,7 +58,7 @@ export default function SmartDocumentHub() {
 
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch("http://127.0.0.1:5001/ocr", {
+        const res = await fetch("http://127.0.0.1:5000/ocr", {
           method: "POST",
           body: formData,
         });
@@ -150,7 +144,7 @@ export default function SmartDocumentHub() {
   async function fetchEmails() {
     setLoadingEmails(true);
     try {
-      const res = await fetch("http://127.0.0.1:5001/check_emails");
+      const res = await fetch("http://127.0.0.1:5000/check_emails");
       const data = await res.json();
       const newFiles = data.messages.map((m, index) => ({
         id: `${Date.now()}-${index}`,
@@ -166,46 +160,6 @@ export default function SmartDocumentHub() {
       setLoadingEmails(false);
     }
   }
-
-  // -----------------------------
-  // Preview handler
-  // -----------------------------
- async function handlePreview(doc) {
-  setPreviewDoc(doc);
-  setLoadingPreview(true);
-
-  try {
-    const formData = new FormData();
-    if (doc.blobUrl) {
-      const res = await fetch(doc.blobUrl);
-      const blob = await res.blob();
-      formData.append("file", blob, doc.name);
-    } else if (doc.downloadUrl) {
-      const res = await fetch(doc.downloadUrl);
-      const blob = await res.blob();
-      formData.append("file", blob, doc.name);
-    } else {
-      const blob = new Blob([doc.rawText], { type: "text/plain" });
-      formData.append("file", blob, doc.name);
-    }
-
-    const response = await fetch("http://127.0.0.1:5001/summarize_file", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-    setSummaryText(data.summary || "(No summary available)");
-    setTranslatedText("(Translation not implemented here)"); // optional
-  } catch (err) {
-    console.error("Preview error:", err);
-    setSummaryText("(Error generating summary)");
-    setTranslatedText("(Error fetching translation)");
-  } finally {
-    setLoadingPreview(false);
-  }
-}
-
 
   const renderSubMenuContent = () => {
     switch (activeSubMenu) {
@@ -243,12 +197,6 @@ export default function SmartDocumentHub() {
                       >
                         Download
                       </a>
-                      <button
-                        onClick={() => handlePreview(d)}
-                        className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
-                      >
-                        Preview
-                      </button>
                       <button
                         onClick={() => handleDelete(d.id)}
                         className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
@@ -336,12 +284,6 @@ export default function SmartDocumentHub() {
                         Download
                       </a>
                       <button
-                        onClick={() => handlePreview(d)}
-                        className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
-                      >
-                        Preview
-                      </button>
-                      <button
                         onClick={() => handleDelete(d.id)}
                         className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
                       >
@@ -407,49 +349,6 @@ export default function SmartDocumentHub() {
           <main className="col-span-3">{renderSubMenuContent()}</main>
         </div>
       </div>
-
-      {/* ------------------- Preview Modal ------------------- */}
-      {previewDoc && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">
-                Preview — {previewDoc.name}
-              </h2>
-              <button
-                onClick={() => setPreviewDoc(null)}
-                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Close
-              </button>
-            </div>
-
-            {loadingPreview ? (
-              <p className="text-gray-600">Loading preview...</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Original */}
-                <div className="p-3 border rounded bg-gray-50">
-                  <h3 className="font-semibold text-gray-700 mb-2">Original Content</h3>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{previewDoc.rawText}</p>
-                </div>
-
-                {/* Translated */}
-                <div className="p-3 border rounded bg-gray-50">
-                  <h3 className="font-semibold text-gray-700 mb-2">Translated Content</h3>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{translatedText}</p>
-                </div>
-
-                {/* Summary */}
-                <div className="p-3 border rounded bg-gray-50">
-                  <h3 className="font-semibold text-gray-700 mb-2">Summary</h3>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{summaryText}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
