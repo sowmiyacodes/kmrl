@@ -316,17 +316,27 @@ export default function SmartDocumentHub() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <header className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">
-            Smart Document Hub — {role.charAt(0).toUpperCase() + role.slice(1)}
-          </h1>
-          <button
-            onClick={() => navigate("/signin")}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-          >
-            Sign Out
-          </button>
-        </header>
+       <header className="flex items-center justify-between mb-6">
+  <div className="flex items-center space-x-4">
+<button
+  onClick={() => window.open("/translator.html", "_blank")}
+  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition"
+>
+  Translate & Preview
+</button>
+
+
+    <h1 className="text-2xl font-bold text-gray-800">
+      Smart Document Hub — {role.charAt(0).toUpperCase() + role.slice(1)}
+    </h1>
+  </div>
+  <button
+    onClick={() => navigate("/signin")}
+    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+  >
+    Sign Out
+  </button>
+</header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
